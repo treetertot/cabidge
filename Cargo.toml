@@ -1,0 +1,8 @@
+[workspace]
+
+members = [
+    "cabidge-code",
+    "cabidge-vm",
+]
+
+resolver = "2"
