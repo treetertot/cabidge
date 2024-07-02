@@ -20,6 +20,6 @@ VM:
 
 ## First Steps
 - [x] Minimal module format
-- [ ] Minimal AOT runtime
+- [ ] Minimal runtime
     - Programs return int32
 - [ ] Minimal language frontend compiler
