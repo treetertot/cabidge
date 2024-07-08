@@ -8,13 +8,11 @@ use crate::func::Function;
 pub struct Module<Sym> {
     pub module_imports: Vec<PathBuf>,
 
-    pub atom_imports: Vec<Import<Sym>>,
+    /// Atoms and types are both universal and tehrefore not namespaced.
+    /// This is for easy interoperability between dynamically loaded modules.
     pub atom_defs: Vec<Atom<Sym>>,
-    /// Atoms are namespaced but types are universal.
-    /// As a result types cannot be imported or exported
     pub type_defs: Vec<TypeDesc>,
-    /// Values are allowed to be polymorphic bc they can be functions
-    pub value_imports: Vec<Import<Sym>>,
+
     pub value_defs: Vec<Function>,
     pub value_exports: Vec<Export<Sym>>,
 }
@@ -26,7 +24,7 @@ pub struct Import<Sym> {
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Reference {
-    pub item: usize,
+    pub (crate) item: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -45,7 +43,7 @@ pub struct Atom<Sym> {
 /// Type of a function or type argument/param
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ArgType {
-    Concrete(Reference),
+    Concrete(Adapted<Reference>),
     Generic(u32),
 }
 
@@ -54,13 +52,15 @@ pub enum ArgType {
 pub enum TypeDesc {
     /// References here are to atoms
     AtomGroup(Vec<Adapted<Reference>>),
+    /// Though curried, these functions do not map cleanly to most language's curried functions.
+    /// Wrappers may be necessary to make functions the desired type.
     Func {
         input: ArgType,
         /// Must either be another func or BottomThunk
         output: ArgType,
     },
     /// References here are to TypeDescs
-    Tuple(Vec<Adapted<Reference>>),
+    Tuple(Vec<Reference>),
     /// A computation that never returns
     BottomThunk,
     Int8,
@@ -70,6 +70,9 @@ pub enum TypeDesc {
     //Float16??
     Float32,
     Float64,
+    /// Contents of typedef is a set of pairs of symbols and function types.
+    Library(Vec<(Reference, Adapted<Reference>)>),
+    Array(Reference),
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]

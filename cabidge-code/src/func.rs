@@ -15,11 +15,18 @@ pub struct Function {
 /// An operation guaranteed to terminate in bounded time (this is why functions do not run when finished applying)
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Op {
-    LoadExtern (Adapted<Reference>),
-    LoadAtom(Adapted<Reference>),
+    LoadStd,
+    LoadSelf,
+    LoadFunc {
+        lib: Value,
+        adapt_func: Adapted<Reference>,
+    },
+    LoadAtom{
+        atom_ref: Reference,
+    },
     Apply {
         func: Value,
-        input: Value,
+        inputs: Vec<Value>,
     },
 }
 

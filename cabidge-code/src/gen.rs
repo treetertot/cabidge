@@ -5,7 +5,7 @@
 
 use std::{collections::HashMap, hash::Hash, path::PathBuf, str::FromStr};
 
-use crate::{func::Function, module::{Atom, Export, Import, Module, Reference, TypeDesc}};
+use crate::{func::Function, module::{Atom, Export, Module, Reference, TypeDesc}};
 
 #[derive(Debug, Clone, Default)]
 pub struct IndexSet<T> {
@@ -34,13 +34,11 @@ impl<T: Clone + Hash + Eq> IndexSet<T> {
 pub struct ModuleBuilder<Sym> {
     module_imports: Vec<PathBuf>,
 
-    atom_imports: Vec<Import<Sym>>,
     atom_names: IndexSet<Sym>,
     atom_args: Vec<usize>,
 
     type_defs: IndexSet<TypeDesc>,
 
-    value_imports: Vec<Import<Sym>>,
     value_defs: Vec<Function>,
     value_exports: Vec<Export<Sym>>,
 }
@@ -49,13 +47,11 @@ impl<Sym: Clone + Hash + Eq> ModuleBuilder<Sym> {
         ModuleBuilder {
             module_imports: Vec::new(),
 
-            atom_imports: Vec::new(),
             atom_names: IndexSet::new(),
             atom_args: Vec::new(),
 
             type_defs: IndexSet::new(),
 
-            value_imports: Vec::new(),
             value_defs: Vec::new(),
             value_exports: Vec::new(),
         }
@@ -80,18 +76,16 @@ impl<Sym: Clone + Hash + Eq> ModuleBuilder<Sym> {
         self.type_defs.insert(type_desc)
     }
     pub fn finish(self) -> Module<Sym> {
-        let Self { mut module_imports, atom_imports, atom_names, atom_args, type_defs, value_imports, value_defs, value_exports } = self;
+        let Self { mut module_imports, atom_names, atom_args, type_defs, value_defs, value_exports } = self;
         module_imports.push(PathBuf::from_str("src").unwrap());
         let atom_defs = atom_names.finish().into_iter().zip(atom_args).map(|(name, num_members)| Atom{ name, num_members }).collect();
         Module {
             module_imports,
 
-            atom_imports,
             atom_defs,
 
             type_defs: type_defs.finish(),
 
-            value_imports,
             value_defs,
             value_exports,
         }
