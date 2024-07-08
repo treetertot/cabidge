@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::marker::PhantomData;
 
 use serde::{Deserialize, Serialize};
 
@@ -6,44 +6,53 @@ use crate::func::Function;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Module<Sym> {
-    pub module_imports: Vec<PathBuf>,
-
+    pub symbols: Vec<Sym>,
     /// Atoms and types are both universal and tehrefore not namespaced.
     /// This is for easy interoperability between dynamically loaded modules.
-    pub atom_defs: Vec<Atom<Sym>>,
+    pub atom_defs: Vec<Atom>,
     pub type_defs: Vec<TypeDesc>,
 
     pub value_defs: Vec<Function>,
-    pub value_exports: Vec<Export<Sym>>,
-}
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Import<Sym> {
-    pub module: usize,
-    pub item_name: Sym,
+    pub value_exports: Vec<Export>,
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Reference {
-    pub (crate) item: usize,
+pub struct SymbolTag;
+
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Reference<T> {
+    item: usize,
+    _tag: PhantomData<T>
+}
+impl<T> Reference<T> {
+    pub(crate) fn new(item: usize) -> Self {
+        Reference { item, _tag: PhantomData }
+    }
+    pub fn get_inner(&self) -> usize {
+        self.item
+    }
+    pub fn retag<O>(self) -> Reference<O> {
+        Reference::new(self.get_inner())
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Export<Sym> {
-    pub rf: Reference,
-    pub name: Sym,
+pub struct Export {
+    pub rf: Reference<Function>,
+    pub name: Reference<SymbolTag>,
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Atom<Sym> {
+pub struct Atom {
     /// All atoms are exported
-    pub name: Sym,
+    pub name: Reference<SymbolTag>,
     pub num_members: usize,
 }
 
 /// Type of a function or type argument/param
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ArgType {
-    Concrete(Adapted<Reference>),
+    Concrete(Adapted<Reference<TypeDesc>>),
     Generic(u32),
 }
 
@@ -51,7 +60,7 @@ pub enum ArgType {
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TypeDesc {
     /// References here are to atoms
-    AtomGroup(Vec<Adapted<Reference>>),
+    AtomGroup(Vec<Adapted<Reference<Atom>>>),
     /// Though curried, these functions do not map cleanly to most language's curried functions.
     /// Wrappers may be necessary to make functions the desired type.
     Func {
@@ -60,19 +69,19 @@ pub enum TypeDesc {
         output: ArgType,
     },
     /// References here are to TypeDescs
-    Tuple(Vec<Reference>),
+    Tuple(Vec<Reference<TypeDesc>>),
     /// A computation that never returns
     BottomThunk,
-    Int8,
-    Int16,
-    Int32,
-    Int64,
+    //Int8,
+    //Int16,
+    //Int32,
+    //Int64,
     //Float16??
-    Float32,
-    Float64,
+    //Float32,
+    //Float64,
     /// Contents of typedef is a set of pairs of symbols and function types.
-    Library(Vec<(Reference, Adapted<Reference>)>),
-    Array(Reference),
+    Library(Vec<(Reference<SymbolTag>, Adapted<Reference<TypeDesc>>)>),
+    //Array(Reference), // later
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]

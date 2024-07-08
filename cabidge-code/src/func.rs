@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{err::Bounds, module::{Adapted, Reference}};
+use crate::{err::Bounds, module::{Adapted, Atom, Reference, SymbolTag, TypeDesc}};
 
 /// Functions take in arguments, run a sequence of [Op]s (mainly [Op::Apply]) to create potential computations,
 /// and then branches on an atom, executing the corresponding computation and throwing out all others.
@@ -19,10 +19,11 @@ pub enum Op {
     LoadSelf,
     LoadFunc {
         lib: Value,
-        adapt_func: Adapted<Reference>,
+        type_ref: Adapted<Reference<TypeDesc>>,
+        adapt_func: Reference<SymbolTag>,
     },
     LoadAtom{
-        atom_ref: Reference,
+        atom_ref: Reference<Atom>,
     },
     Apply {
         func: Value,
@@ -36,7 +37,7 @@ pub struct Value(pub usize);
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Arg {
     pub val: Value,
-    pub type_ref: Reference,
+    pub type_ref: Adapted<Reference<TypeDesc>>,
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
@@ -56,7 +57,7 @@ pub enum Terminal {
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MatchArm {
-    pub atom: Reference,
+    pub atom: Reference<Atom>,
     /// arguments in the atom are passed to this function
     pub branch: Value
 }
