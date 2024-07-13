@@ -120,12 +120,12 @@ impl ModuleBuilder {
         self.imported_modules.insert(path)
     }
     pub fn create_atom(&mut self, name: String, num_members: usize) -> Result<Reference<Use<Atom>>, CodeGenErr> {
-        let s = self.symbols.insert(name).retag();
+        let s = self.symbols.insert(name);
         let r = self.atom_defs.insert(s, num_members)?.retag();
         Ok(self.atom_uses.insert(Use::Internal(r)))
     }
     pub fn import_atom(&mut self, name: String, source: Reference<PathBuf>) -> Reference<Use<Atom>> {
-        let s = self.symbols.insert(name).retag();
+        let s = self.symbols.insert(name);
         let a = self.atom_imports.insert(Import::new(s, source));
         self.atom_uses.insert(Use::External(a))
     }
@@ -137,11 +137,11 @@ impl ModuleBuilder {
         self.func_uses.insert(Use::Internal(f))
     }
     pub fn export_function(&mut self, name: String, rf: Reference<Use<Function>>) {
-        let s = self.symbols.insert(name).retag();
+        let s = self.symbols.insert(name);
         self.func_exports.insert(Export { rf, name: s });
     }
     pub fn import_function(&mut self, name: String, source: Reference<PathBuf>) -> Reference<Use<Function>> {
-        let s = self.symbols.insert(name).retag();
+        let s = self.symbols.insert(name);
         let import = self.func_imports.insert(Import::new(s, source));
         self.func_uses.insert(Use::External(import))
     }
