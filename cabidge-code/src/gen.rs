@@ -3,30 +3,80 @@
 //! The language here is kinda lazy I think??
 //! You can check the func module for the behavior of [Function]s.
 
-use std::{collections::HashMap, hash::Hash};
+use std::{collections::HashMap, hash::Hash, path::PathBuf};
 
-use crate::{func::Function, module::{Atom, Export, Module, Reference, TypeDesc}};
+use crate::{func::Function, module::{Atom, Export, Import, Module, Reference, SymbolTag, TypeDesc, Use}};
 
-#[derive(Debug, Clone, Default)]
-pub struct IndexSet<T> {
-    dedup: HashMap<T, Reference<T>>,
-    items: Vec<T>,
+#[derive(Debug, Clone)]
+pub struct IndexMap<T, I> {
+    dedup: HashMap<T, (Reference<T>, I)>,
+    items: Vec<(T, I)>,
 }
-impl<T: Clone + Hash + Eq> IndexSet<T> {
-    pub fn new() -> IndexSet<T> {
-        IndexSet { dedup: HashMap::new(), items: Vec::new() }
+impl<T: Clone + Hash + Eq, I: Clone + Eq> IndexMap<T, I> {
+    pub fn new() -> IndexMap<T, I> {
+        IndexMap { dedup: HashMap::new(), items: Vec::new() }
     }
-    pub fn insert(&mut self, item: T) -> Reference<T> {
+    pub fn insert(&mut self, item: T, data: I) -> Result<Reference<T>, CodeGenErr> {
         if let Some(idx) = self.dedup.get(&item) {
-            return idx.clone();
+            if idx.1 != data {
+                return Err(CodeGenErr::NameCollision);
+            }
+            return Ok(idx.0.clone());
         }
         let idx = Reference::new(self.items.len());
-        self.dedup.insert(item.clone(), idx.clone());
-        self.items.push(item);
-        idx
+        self.dedup.insert(item.clone(), (idx.clone(), data.clone()));
+        self.items.push((item, data));
+        Ok(idx)
+    }
+    pub fn finish(self) -> Vec<(T, I)> {
+        self.items
+    }
+}
+impl<T: Clone + Hash + Eq, I: Clone + Eq> Default for IndexMap<T, I> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct IndexSet<T> (IndexMap<T, ()>);
+impl<T: Clone + Hash + Eq> IndexSet<T> {
+    pub fn new() -> IndexSet<T> {
+        Self (
+            Default::default()
+        )
+    }
+    pub fn insert(&mut self, item: T) -> Reference<T> {
+        self.0.insert(item, ()).unwrap()
     }
     pub fn finish(self) -> Vec<T> {
-        self.items
+        self.0.finish().into_iter().map(|(t, ())| t).collect()
+    }
+}
+impl<T: Clone + Hash + Eq> Default for IndexSet<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct IndexVec<T> (Vec<T>);
+impl<T> IndexVec<T> {
+    pub fn new() -> Self {
+        IndexVec(Vec::new())
+    }
+    pub fn insert(&mut self, item: T) -> Reference<T> {
+        let r = Reference::new(self.0.len());
+        self.0.push(item);
+        r
+    }
+    pub fn finish(self) -> Vec<T> {
+        self.0
+    }
+}
+impl<T> Default for IndexVec<T> {
+    fn default() -> Self {
+        IndexVec::new()
     }
 }
 
@@ -34,52 +84,73 @@ impl<T: Clone + Hash + Eq> IndexSet<T> {
 pub struct ModuleBuilder<Sym> {
     symbols: IndexSet<Sym>,
 
-    atoms: IndexSet<Atom>,
+    imported_modules: IndexSet<PathBuf>,
+
+    atom_defs: IndexMap<Reference<SymbolTag>, usize>,
+    atom_imports: IndexSet<Import<Atom>>,
+    atom_uses: IndexSet<Use<Atom>>,
 
     type_defs: IndexSet<TypeDesc>,
 
-    value_defs: Vec<Function>,
-    value_exports: Vec<Export>,
+    func_defs: IndexVec<Function>,
+    func_imports: IndexSet<Import<Function>>,
+    func_exports: IndexVec<Export>,
+    func_uses: IndexSet<Use<Function>>,
 }
 impl<Sym: Clone + Hash + Eq> ModuleBuilder<Sym> {
-    pub fn new() -> ModuleBuilder<Sym> {
+    pub fn new() -> Self {
         ModuleBuilder {
-            symbols: IndexSet::new(),
+            symbols: Default::default(),
 
-            atoms: IndexSet::new(),
+            imported_modules: Default::default(),
 
-            type_defs: IndexSet::new(),
+            atom_defs: Default::default(),
+            atom_imports: Default::default(),
+            atom_uses: Default::default(),
 
-            value_defs: Vec::new(),
-            value_exports: Vec::new(),
+            type_defs: Default::default(),
+
+            func_defs: Default::default(),
+            func_imports: Default::default(),
+            func_exports: Default::default(),
+            func_uses: Default::default(),
         }
     }
-    pub fn add_atom(&mut self, name: Sym, num_members: usize) -> Reference<Atom> {
-        let name = self.symbols.insert(name).retag();
-        self.atoms.insert(Atom { name, num_members })
+    pub fn import_module(&mut self, path: PathBuf) -> Reference<PathBuf> {
+        self.imported_modules.insert(path)
     }
-    pub fn export_value(&mut self, name: Sym, rf: Reference<Function>) {
-        let name = self.symbols.insert(name).retag();
-        self.value_exports.push(Export { rf, name });
+    pub fn create_atom(&mut self, name: Sym, num_members: usize) -> Result<Reference<Use<Atom>>, CodeGenErr> {
+        let s = self.symbols.insert(name).retag();
+        let r = self.atom_defs.insert(s, num_members)?.retag();
+        Ok(self.atom_uses.insert(Use::Internal(r)))
     }
-    pub fn add_function(&mut self, func: Function) -> Reference<Function> {
-        let item = self.value_defs.len();
-        self.value_defs.push(func);
-        Reference::new(item)
+    pub fn import_atom(&mut self, name: Sym, source: Reference<PathBuf>) -> Reference<Use<Atom>> {
+        let s = self.symbols.insert(name).retag();
+        let a = self.atom_imports.insert(Import::new(s, source));
+        self.atom_uses.insert(Use::External(a))
     }
     pub fn register_type(&mut self, type_desc: TypeDesc) -> Reference<TypeDesc> {
         self.type_defs.insert(type_desc)
     }
-    pub fn finish(self) -> Module<Sym> {
-        let Self { symbols, atoms, type_defs, value_defs, value_exports } = self;
-        Module {
-            symbols: symbols.finish(),
-            atom_defs: atoms.finish(),
-
-            type_defs: type_defs.finish(),
-
-            value_defs,
-            value_exports,
-        }
+    pub fn create_function(&mut self, func: Function) -> Reference<Use<Function>> {
+        let f = self.func_defs.insert(func);
+        self.func_uses.insert(Use::Internal(f))
     }
+    pub fn export_function(&mut self, name: Sym, rf: Reference<Use<Function>>) {
+        let s = self.symbols.insert(name).retag();
+        self.func_exports.insert(Export { rf, name: s });
+    }
+    pub fn import_function(&mut self, name: Sym, source: Reference<PathBuf>) -> Reference<Use<Function>> {
+        let s = self.symbols.insert(name).retag();
+        let import = self.func_imports.insert(Import::new(s, source));
+        self.func_uses.insert(Use::External(import))
+    }
+    pub fn finish(self) -> Module<Sym> {
+        todo!()
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum CodeGenErr {
+    NameCollision,
 }

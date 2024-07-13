@@ -1,4 +1,4 @@
-use std::marker::PhantomData;
+use std::{fs::File, marker::PhantomData, path::{Path, PathBuf}};
 
 use serde::{Deserialize, Serialize};
 
@@ -7,19 +7,44 @@ use crate::func::Function;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Module<Sym> {
     pub symbols: Vec<Sym>,
-    /// Atoms and types are both universal and tehrefore not namespaced.
-    /// This is for easy interoperability between dynamically loaded modules.
+
+    pub imported_modules: Vec<PathBuf>,
+    /// Atoms are automatically exported
     pub atom_defs: Vec<Atom>,
+    pub atom_imports: Vec<Import<Atom>>,
+    pub atom_uses: Vec<Use<Atom>>,
+    /// Types are anonymous and therefore not namespaced or importable.
+    /// This is for easy interoperability between dynamically loaded modules.
     pub type_defs: Vec<TypeDesc>,
 
-    pub value_defs: Vec<Function>,
-    pub value_exports: Vec<Export>,
+    pub func_defs: Vec<Function>,
+    pub func_imports: Vec<Import<Function>>,
+    pub func_exports: Vec<Export>,
+    pub func_uses: Vec<Use<Function>>
+}
+impl<Sym> Module<Sym> {
+    pub fn write_to_file<P>(&self, path: P) -> bincode::Result<()>
+    where
+        P: AsRef<Path>,
+        Sym: Serialize
+    {
+        let file = File::create(path).map_err(bincode::ErrorKind::Io).map_err(Box::new)?;
+        bincode::serialize_into(file, self)
+    }
+    pub fn read_from_file<P>(&self, path: P) -> bincode::Result<()>
+    where
+        P: AsRef<Path>,
+        for<'de> Sym: Deserialize<'de>
+    {
+        let file = File::open(path).map_err(bincode::ErrorKind::Io).map_err(Box::new)?;
+        bincode::deserialize_from(file)
+    }
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SymbolTag;
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Reference<T> {
     item: usize,
     _tag: PhantomData<T>
@@ -35,11 +60,35 @@ impl<T> Reference<T> {
         Reference::new(self.get_inner())
     }
 }
+impl<T> Clone for Reference<T> {
+    fn clone(&self) -> Self {
+        Self::new(self.item)
+    }
+}
+impl<T> Copy for Reference<T> {}
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq)]
 pub struct Export {
-    pub rf: Reference<Function>,
+    pub rf: Reference<Use<Function>>,
     pub name: Reference<SymbolTag>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq)]
+pub struct Import<T> {
+    pub name: Reference<SymbolTag>,
+    pub source: Reference<PathBuf>,
+    _tag: PhantomData<T>,
+}
+impl<T> Import<T> {
+    pub fn new(name: Reference<SymbolTag>, source: Reference<PathBuf>) -> Self {
+        Import { name, source, _tag: PhantomData }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq)]
+pub enum Use<T> {
+    Internal(Reference<T>),
+    External(Reference<Import<T>>)
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
@@ -79,8 +128,8 @@ pub enum TypeDesc {
     //Float16??
     //Float32,
     //Float64,
-    /// Contents of typedef is a set of pairs of symbols and function types.
-    Library(Vec<(Reference<SymbolTag>, Adapted<Reference<TypeDesc>>)>),
+    // /// Contents of typedef is a set of pairs of symbols and function types.
+    //Library(Vec<(Reference<SymbolTag>, Adapted<Reference<TypeDesc>>)>),
     //Array(Reference), // later
 }
 

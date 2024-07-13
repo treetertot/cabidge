@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{err::Bounds, module::{Adapted, Atom, Reference, SymbolTag, TypeDesc}};
+use crate::{err::Bounds, module::{Adapted, Atom, Reference, TypeDesc}};
 
 /// Functions take in arguments, run a sequence of [Op]s (mainly [Op::Apply]) to create potential computations,
 /// and then branches on an atom, executing the corresponding computation and throwing out all others.
@@ -8,20 +8,14 @@ use crate::{err::Bounds, module::{Adapted, Atom, Reference, SymbolTag, TypeDesc}
 pub struct Function {
     pub args: Vec<Arg>,
     // no need for a return type. it is always a BottomThunk
-    pub defs: Vec<Def>,
+    pub def: Vec<Def>,
     pub term: Terminal
 }
 
 /// An operation guaranteed to terminate in bounded time (this is why functions do not run when finished applying)
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Op {
-    LoadStd,
-    LoadSelf,
-    LoadFunc {
-        lib: Value,
-        type_ref: Adapted<Reference<TypeDesc>>,
-        adapt_func: Reference<SymbolTag>,
-    },
+    LoadFunc(Reference<Function>),
     LoadAtom{
         atom_ref: Reference<Atom>,
     },
