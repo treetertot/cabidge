@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 use crate::func::Function;
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Module<Sym> {
-    pub symbols: Vec<Sym>,
+pub struct Module {
+    pub symbols: Vec<String>,
 
     pub imported_modules: Vec<PathBuf>,
     /// Atoms are automatically exported
@@ -22,11 +22,10 @@ pub struct Module<Sym> {
     pub func_exports: Vec<Export>,
     pub func_uses: Vec<Use<Function>>
 }
-impl<Sym> Module<Sym> {
+impl Module {
     pub fn write_to_file<P>(&self, path: P) -> bincode::Result<()>
     where
         P: AsRef<Path>,
-        Sym: Serialize
     {
         let file = File::create(path).map_err(bincode::ErrorKind::Io).map_err(Box::new)?;
         bincode::serialize_into(file, self)
@@ -34,15 +33,11 @@ impl<Sym> Module<Sym> {
     pub fn read_from_file<P>(&self, path: P) -> bincode::Result<()>
     where
         P: AsRef<Path>,
-        for<'de> Sym: Deserialize<'de>
     {
         let file = File::open(path).map_err(bincode::ErrorKind::Io).map_err(Box::new)?;
         bincode::deserialize_from(file)
     }
 }
-
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SymbolTag;
 
 #[derive(Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Reference<T> {
@@ -70,17 +65,17 @@ impl<T> Copy for Reference<T> {}
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq)]
 pub struct Export {
     pub rf: Reference<Use<Function>>,
-    pub name: Reference<SymbolTag>,
+    pub name: Reference<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq)]
 pub struct Import<T> {
-    pub name: Reference<SymbolTag>,
+    pub name: Reference<String>,
     pub source: Reference<PathBuf>,
     _tag: PhantomData<T>,
 }
 impl<T> Import<T> {
-    pub fn new(name: Reference<SymbolTag>, source: Reference<PathBuf>) -> Self {
+    pub fn new(name: Reference<String>, source: Reference<PathBuf>) -> Self {
         Import { name, source, _tag: PhantomData }
     }
 }
@@ -94,7 +89,7 @@ pub enum Use<T> {
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Atom {
     /// All atoms are exported
-    pub name: Reference<SymbolTag>,
+    pub name: Reference<String>,
     pub num_members: usize,
 }
 
@@ -129,7 +124,7 @@ pub enum TypeDesc {
     //Float32,
     //Float64,
     // /// Contents of typedef is a set of pairs of symbols and function types.
-    //Library(Vec<(Reference<SymbolTag>, Adapted<Reference<TypeDesc>>)>),
+    //Library(Vec<(Reference<String>, Adapted<Reference<TypeDesc>>)>),
     //Array(Reference), // later
 }
 

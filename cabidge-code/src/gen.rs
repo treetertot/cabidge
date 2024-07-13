@@ -5,7 +5,7 @@
 
 use std::{collections::HashMap, hash::Hash, path::PathBuf};
 
-use crate::{func::Function, module::{Atom, Export, Import, Module, Reference, SymbolTag, TypeDesc, Use}};
+use crate::{func::Function, module::{Atom, Export, Import, Module, Reference, TypeDesc, Use}};
 
 #[derive(Debug, Clone)]
 pub struct IndexMap<T, I> {
@@ -81,12 +81,12 @@ impl<T> Default for IndexVec<T> {
 }
 
 #[derive(Debug, Clone)]
-pub struct ModuleBuilder<Sym> {
-    symbols: IndexSet<Sym>,
+pub struct ModuleBuilder {
+    symbols: IndexSet<String>,
 
     imported_modules: IndexSet<PathBuf>,
 
-    atom_defs: IndexMap<Reference<SymbolTag>, usize>,
+    atom_defs: IndexMap<Reference<String>, usize>,
     atom_imports: IndexSet<Import<Atom>>,
     atom_uses: IndexSet<Use<Atom>>,
 
@@ -97,7 +97,7 @@ pub struct ModuleBuilder<Sym> {
     func_exports: IndexVec<Export>,
     func_uses: IndexSet<Use<Function>>,
 }
-impl<Sym: Clone + Hash + Eq> ModuleBuilder<Sym> {
+impl ModuleBuilder {
     pub fn new() -> Self {
         ModuleBuilder {
             symbols: Default::default(),
@@ -119,12 +119,12 @@ impl<Sym: Clone + Hash + Eq> ModuleBuilder<Sym> {
     pub fn import_module(&mut self, path: PathBuf) -> Reference<PathBuf> {
         self.imported_modules.insert(path)
     }
-    pub fn create_atom(&mut self, name: Sym, num_members: usize) -> Result<Reference<Use<Atom>>, CodeGenErr> {
+    pub fn create_atom(&mut self, name: String, num_members: usize) -> Result<Reference<Use<Atom>>, CodeGenErr> {
         let s = self.symbols.insert(name).retag();
         let r = self.atom_defs.insert(s, num_members)?.retag();
         Ok(self.atom_uses.insert(Use::Internal(r)))
     }
-    pub fn import_atom(&mut self, name: Sym, source: Reference<PathBuf>) -> Reference<Use<Atom>> {
+    pub fn import_atom(&mut self, name: String, source: Reference<PathBuf>) -> Reference<Use<Atom>> {
         let s = self.symbols.insert(name).retag();
         let a = self.atom_imports.insert(Import::new(s, source));
         self.atom_uses.insert(Use::External(a))
@@ -136,16 +136,16 @@ impl<Sym: Clone + Hash + Eq> ModuleBuilder<Sym> {
         let f = self.func_defs.insert(func);
         self.func_uses.insert(Use::Internal(f))
     }
-    pub fn export_function(&mut self, name: Sym, rf: Reference<Use<Function>>) {
+    pub fn export_function(&mut self, name: String, rf: Reference<Use<Function>>) {
         let s = self.symbols.insert(name).retag();
         self.func_exports.insert(Export { rf, name: s });
     }
-    pub fn import_function(&mut self, name: Sym, source: Reference<PathBuf>) -> Reference<Use<Function>> {
+    pub fn import_function(&mut self, name: String, source: Reference<PathBuf>) -> Reference<Use<Function>> {
         let s = self.symbols.insert(name).retag();
         let import = self.func_imports.insert(Import::new(s, source));
         self.func_uses.insert(Use::External(import))
     }
-    pub fn finish(self) -> Module<Sym> {
+    pub fn finish(self) -> Module {
         todo!()
     }
 }

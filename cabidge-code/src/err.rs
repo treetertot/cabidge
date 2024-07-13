@@ -38,16 +38,3 @@ impl<T: PartialEq> PartialEq for Bounded<T> {
     }
 }
 impl<T: PartialEq> Eq for Bounded<T> {}
-
-pub trait DebugSource {
-    fn get_bounds(&self, bounds: Bounds) -> String;
-}
-
-impl<S: Borrow<str>> DebugSource for S {
-    fn get_bounds(&self, bounds: Bounds) -> String {
-        let src: &str = self.borrow();
-        let Bounds { start, end } = bounds;
-        let [s, e] = [start, end].map(|n| src.len() - (n as usize));
-        src[s..e].into()
-    }
-}
