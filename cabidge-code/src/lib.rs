@@ -4,12 +4,11 @@
 //! This language has no strict evaluation order.
 //! Probably be besgt to treat it like it is lazy.
 //! Monads will probably be needed to contain side effects to ensure evaluation.
-//! 
+//!
 //! The language defined here is designed to be modular
 //! and prioritize simplicity > size > speed.
 //! The vm itself will prioritize speed but that is a different crate.
 
-pub mod err;
-pub mod module;
 pub mod func;
 pub mod gen;
+pub mod module;

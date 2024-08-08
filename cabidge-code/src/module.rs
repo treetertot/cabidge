@@ -1,4 +1,6 @@
-use std::{fs::File, marker::PhantomData, path::{Path, PathBuf}};
+use std::{
+    collections::BTreeSet, fs::File, hash::Hash, marker::PhantomData, path::{Path, PathBuf}
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -20,33 +22,40 @@ pub struct Module {
     pub func_defs: Vec<Function>,
     pub func_imports: Vec<Import<Function>>,
     pub func_exports: Vec<Export>,
-    pub func_uses: Vec<Use<Function>>
+    pub func_uses: Vec<Use<Function>>,
 }
 impl Module {
     pub fn write_to_file<P>(&self, path: P) -> bincode::Result<()>
     where
         P: AsRef<Path>,
     {
-        let file = File::create(path).map_err(bincode::ErrorKind::Io).map_err(Box::new)?;
+        let file = File::create(path)
+            .map_err(bincode::ErrorKind::Io)
+            .map_err(Box::new)?;
         bincode::serialize_into(file, self)
     }
     pub fn read_from_file<P>(&self, path: P) -> bincode::Result<()>
     where
         P: AsRef<Path>,
     {
-        let file = File::open(path).map_err(bincode::ErrorKind::Io).map_err(Box::new)?;
+        let file = File::open(path)
+            .map_err(bincode::ErrorKind::Io)
+            .map_err(Box::new)?;
         bincode::deserialize_from(file)
     }
 }
 
-#[derive(Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Reference<T> {
     item: usize,
-    _tag: PhantomData<T>
+    _tag: PhantomData<T>,
 }
 impl<T> Reference<T> {
     pub(crate) fn new(item: usize) -> Self {
-        Reference { item, _tag: PhantomData }
+        Reference {
+            item,
+            _tag: PhantomData,
+        }
     }
     pub fn get_inner(&self) -> usize {
         self.item
@@ -61,6 +70,28 @@ impl<T> Clone for Reference<T> {
     }
 }
 impl<T> Copy for Reference<T> {}
+impl<T> PartialEq for Reference<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.item == other.item
+    }
+}
+impl<T> Eq for Reference<T> {}
+impl<T> PartialOrd for Reference<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.item.partial_cmp(&other.item)
+    }
+}
+impl<T> Ord for Reference<T> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.item.cmp(&other.item)
+    }
+}
+impl <T> Hash for Reference<T> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        state.write_usize(self.item)
+    }
+}
+
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq)]
 pub struct Export {
@@ -76,14 +107,18 @@ pub struct Import<T> {
 }
 impl<T> Import<T> {
     pub fn new(name: Reference<String>, source: Reference<PathBuf>) -> Self {
-        Import { name, source, _tag: PhantomData }
+        Import {
+            name,
+            source,
+            _tag: PhantomData,
+        }
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq)]
 pub enum Use<T> {
     Internal(Reference<T>),
-    External(Reference<Import<T>>)
+    External(Reference<Import<T>>),
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
@@ -94,7 +129,7 @@ pub struct Atom {
 }
 
 /// Type of a function or type argument/param
-#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum ArgType {
     Concrete(Adapted<Reference<TypeDesc>>),
     Generic(u32),
@@ -104,21 +139,17 @@ pub enum ArgType {
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TypeDesc {
     /// References here are to atoms
-    AtomGroup(Vec<Adapted<Reference<Atom>>>),
+    AtomGroup(BTreeSet<Adapted<Reference<Atom>>>),
     /// Though curried, these functions do not map cleanly to most language's curried functions.
     /// Wrappers may be necessary to make functions the desired type.
-    Func {
-        input: ArgType,
-        /// Must either be another func or BottomThunk
-        output: ArgType,
-    },
+    Func(Vec<ArgType>),
     /// References here are to TypeDescs
     Tuple(Vec<Reference<TypeDesc>>),
     /// A computation that never returns
     BottomThunk,
     //Int8,
     //Int16,
-    //Int32,
+    Int32,
     //Int64,
     //Float16??
     //Float32,
@@ -128,7 +159,7 @@ pub enum TypeDesc {
     //Array(Reference), // later
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Adapted<T> {
     pub params: Vec<ArgType>,
     pub item: T,

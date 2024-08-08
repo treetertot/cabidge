@@ -1,11 +1,14 @@
 //! Codegen tools
-//! 
+//!
 //! The language here is kinda lazy I think??
 //! You can check the func module for the behavior of [Function]s.
 
 use std::{collections::HashMap, hash::Hash, path::PathBuf};
 
-use crate::{func::Function, module::{Atom, Export, Import, Module, Reference, TypeDesc, Use}};
+use crate::{
+    func::Function,
+    module::{Atom, Export, Import, Module, Reference, TypeDesc, Use},
+};
 
 #[derive(Debug, Clone)]
 pub struct IndexMap<T, I> {
@@ -14,7 +17,10 @@ pub struct IndexMap<T, I> {
 }
 impl<T: Clone + Hash + Eq, I: Clone + Eq> IndexMap<T, I> {
     pub fn new() -> IndexMap<T, I> {
-        IndexMap { dedup: HashMap::new(), items: Vec::new() }
+        IndexMap {
+            dedup: HashMap::new(),
+            items: Vec::new(),
+        }
     }
     pub fn insert(&mut self, item: T, data: I) -> Result<Reference<T>, CodeGenErr> {
         if let Some(idx) = self.dedup.get(&item) {
@@ -39,12 +45,10 @@ impl<T: Clone + Hash + Eq, I: Clone + Eq> Default for IndexMap<T, I> {
 }
 
 #[derive(Debug, Clone)]
-pub struct IndexSet<T> (IndexMap<T, ()>);
+pub struct IndexSet<T>(IndexMap<T, ()>);
 impl<T: Clone + Hash + Eq> IndexSet<T> {
     pub fn new() -> IndexSet<T> {
-        Self (
-            Default::default()
-        )
+        Self(Default::default())
     }
     pub fn insert(&mut self, item: T) -> Reference<T> {
         self.0.insert(item, ()).unwrap()
@@ -60,7 +64,7 @@ impl<T: Clone + Hash + Eq> Default for IndexSet<T> {
 }
 
 #[derive(Debug, Clone)]
-pub struct IndexVec<T> (Vec<T>);
+pub struct IndexVec<T>(Vec<T>);
 impl<T> IndexVec<T> {
     pub fn new() -> Self {
         IndexVec(Vec::new())
@@ -82,20 +86,20 @@ impl<T> Default for IndexVec<T> {
 
 #[derive(Debug, Clone)]
 pub struct ModuleBuilder {
-    symbols: IndexSet<String>,
+    pub symbols: IndexSet<String>,
 
-    imported_modules: IndexSet<PathBuf>,
+    pub imported_modules: IndexSet<PathBuf>,
 
-    atom_defs: IndexMap<Reference<String>, usize>,
-    atom_imports: IndexSet<Import<Atom>>,
-    atom_uses: IndexSet<Use<Atom>>,
+    pub atom_defs: IndexMap<Reference<String>, usize>,
+    pub atom_imports: IndexSet<Import<Atom>>,
+    pub atom_uses: IndexSet<Use<Atom>>,
 
-    type_defs: IndexSet<TypeDesc>,
+    pub type_defs: IndexSet<TypeDesc>,
 
-    func_defs: IndexVec<Function>,
-    func_imports: IndexSet<Import<Function>>,
-    func_exports: IndexVec<Export>,
-    func_uses: IndexSet<Use<Function>>,
+    pub func_defs: IndexVec<Function>,
+    pub func_imports: IndexSet<Import<Function>>,
+    pub func_exports: IndexVec<Export>,
+    pub func_uses: IndexSet<Use<Function>>,
 }
 impl ModuleBuilder {
     pub fn new() -> Self {
@@ -119,12 +123,20 @@ impl ModuleBuilder {
     pub fn import_module(&mut self, path: PathBuf) -> Reference<PathBuf> {
         self.imported_modules.insert(path)
     }
-    pub fn create_atom(&mut self, name: String, num_members: usize) -> Result<Reference<Use<Atom>>, CodeGenErr> {
+    pub fn create_atom(
+        &mut self,
+        name: String,
+        num_members: usize,
+    ) -> Result<Reference<Use<Atom>>, CodeGenErr> {
         let s = self.symbols.insert(name);
         let r = self.atom_defs.insert(s, num_members)?.retag();
         Ok(self.atom_uses.insert(Use::Internal(r)))
     }
-    pub fn import_atom(&mut self, name: String, source: Reference<PathBuf>) -> Reference<Use<Atom>> {
+    pub fn import_atom(
+        &mut self,
+        name: String,
+        source: Reference<PathBuf>,
+    ) -> Reference<Use<Atom>> {
         let s = self.symbols.insert(name);
         let a = self.atom_imports.insert(Import::new(s, source));
         self.atom_uses.insert(Use::External(a))
@@ -140,7 +152,11 @@ impl ModuleBuilder {
         let s = self.symbols.insert(name);
         self.func_exports.insert(Export { rf, name: s });
     }
-    pub fn import_function(&mut self, name: String, source: Reference<PathBuf>) -> Reference<Use<Function>> {
+    pub fn import_function(
+        &mut self,
+        name: String,
+        source: Reference<PathBuf>,
+    ) -> Reference<Use<Function>> {
         let s = self.symbols.insert(name);
         let import = self.func_imports.insert(Import::new(s, source));
         self.func_uses.insert(Use::External(import))
