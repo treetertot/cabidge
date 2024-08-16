@@ -3,7 +3,9 @@
 //! The language here is kinda lazy I think??
 //! You can check the func module for the behavior of [Function]s.
 
-use std::{collections::HashMap, hash::Hash, path::PathBuf};
+use std::{collections::HashMap, hash::Hash, marker::PhantomData, path::PathBuf};
+
+use hibitset::BitSet;
 
 use crate::{
     func::Function,
@@ -81,6 +83,28 @@ impl<T> IndexVec<T> {
 impl<T> Default for IndexVec<T> {
     fn default() -> Self {
         IndexVec::new()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct RefSet<T> {
+    pub inner: BitSet,
+    _tag: PhantomData<T>,
+}
+impl<T> RefSet<T> {
+    pub fn new() -> Self {
+        Self { inner: BitSet::new(), _tag: PhantomData }
+    }
+    pub fn insert(&mut self, item: Reference<T>) {
+        self.inner.add(item.get_inner() as u32);
+    }
+    pub fn contains(&self, item: Reference<T>) -> bool {
+        self.inner.contains(item.get_inner() as u32)
+    }
+}
+impl<T> Default for RefSet<T> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

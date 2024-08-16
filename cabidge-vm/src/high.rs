@@ -1,6 +1,6 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::{HashMap, HashSet}, path::PathBuf};
 
-use cabidge_code::{func::{Arg, Function as Func, Synced, Terminal, Value}, r#gen::{IndexMap, IndexSet, IndexVec}, module::{Reference, TypeDesc}};
+use cabidge_code::{func::{Arg, Function as Func, Synced, Terminal, Value}, r#gen::{IndexMap, IndexSet, IndexVec, RefSet}, module::{Atom as ModAtom, Module, Reference, TypeDesc}};
 
 pub enum Op {
     Terminate(Value),
@@ -32,18 +32,23 @@ pub struct Assignment {
     op: Op
 }
 
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct AtomDesc {
     pub source: Reference<PathBuf>,
     pub name: Reference<String>
 }
 
+#[derive(Debug, Clone)]
 pub struct Atom {
     pub desc: AtomDesc,
     pub num_members: usize,
 }
 
+#[derive(Debug, Default)]
 pub struct ModMerge {
     symbols: IndexSet<String>,
+
+    absorbed_modules: RefSet<Reference<PathBuf>>,
 
     modules: IndexSet<PathBuf>,
     atoms: IndexMap<AtomDesc, usize>,
@@ -52,4 +57,9 @@ pub struct ModMerge {
 
     func_defs: IndexVec<Option<Func>>,
     func_names: HashMap<(Reference<PathBuf>, Reference<String>), Reference<Option<Func>>>
+}
+impl ModMerge {
+    pub fn absorb(&mut self, path: PathBuf, module: Module) -> () {
+        
+    } 
 }

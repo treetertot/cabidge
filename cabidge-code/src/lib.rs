@@ -8,6 +8,8 @@
 //! The language defined here is designed to be modular
 //! and prioritize simplicity > size > speed.
 //! The vm itself will prioritize speed but that is a different crate.
+//! 
+//! This crate here outlines a cps that was really the result of trying to make function calls and block jumps the same in SSA.
 
 pub mod func;
 pub mod gen;
